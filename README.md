@@ -8,12 +8,6 @@ An end-to-end machine learning project that predicts customer churn for a teleco
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-- [Running the Training Pipeline](#running-the-training-pipeline)
-- [Serving the Model](#serving-the-model)
-- [Docker](#docker)
-- [CI/CD & Deployment](#cicd--deployment)
-- [License](#license)
 
 ## Overview
 
