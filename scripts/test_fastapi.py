@@ -1,6 +1,6 @@
 import requests
 
-url = "http://127.0.0.1:8000/predict"
+url = "https://customer-churn-api-1ggw.onrender.com/predict"
 
 sample_data = {
     "gender": "Male",
