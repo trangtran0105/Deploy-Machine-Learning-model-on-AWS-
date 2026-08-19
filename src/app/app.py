@@ -4,16 +4,20 @@ import gradio as gr
 import os
 import sys
 
-# Ensure we can import from src/serving when running "uvicorn src.app.app:app"
+# Ensure we can import from src/serving when running "uvicorn app.app:app"
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from serving.inference import predict  # our single source of truth for inference
 
-app = FastAPI()
+app = FastAPI(
+    title="Telco Customer Churn Prediction API",
+    description="ML API for predicting customer churn in telecom industry",
+    version="1.0.0",
+)
 
 @app.get("/")
 def root():
-    return {"status": "ok"}
+    return {"status": "ok", "model": "telco-churn"}
 
 # Request schema (same fields you collect in the UI)
 class CustomerData(BaseModel):
@@ -44,13 +48,56 @@ def api_predict(data: CustomerData):
     except Exception as e:
         return {"error": str(e)}
 
-# --- Gradio UI wrappers the same predict() ---
-def gradio_interface(
+# === GRADIO UI with input validation ===
+def validate_and_predict(
     gender, Partner, Dependents, PhoneService, MultipleLines,
     InternetService, OnlineSecurity, OnlineBackup, DeviceProtection,
     TechSupport, StreamingTV, StreamingMovies, Contract,
     PaperlessBilling, PaymentMethod, tenure, MonthlyCharges, TotalCharges
 ):
+    # --- Required fields validation ---
+    required_fields = {
+        "Gender": gender,
+        "Partner": Partner,
+        "Dependents": Dependents,
+        "Phone Service": PhoneService,
+        "Multiple Lines": MultipleLines,
+        "Internet Service": InternetService,
+        "Online Security": OnlineSecurity,
+        "Online Backup": OnlineBackup,
+        "Device Protection": DeviceProtection,
+        "Tech Support": TechSupport,
+        "Streaming TV": StreamingTV,
+        "Streaming Movies": StreamingMovies,
+        "Contract": Contract,
+        "Paperless Billing": PaperlessBilling,
+        "Payment Method": PaymentMethod,
+        "Tenure": tenure,
+        "Monthly Charges": MonthlyCharges,
+        "Total Charges": TotalCharges,
+    }
+    for field_name, field_value in required_fields.items():
+        if field_value is None or str(field_value).strip() == "":
+            raise gr.Error("⚠️ Please fill in all required information")
+
+    # --- Validate tenure ---
+    if not str(tenure).strip().isdigit():
+        raise gr.Error("⚠️ Tenure must be a whole number")
+
+    # --- Validate monthly / total charges ---
+    try:
+        monthly_val = float(MonthlyCharges)
+    except (TypeError, ValueError):
+        raise gr.Error("⚠️ Monthly Charges must be a valid number")
+
+    try:
+        total_val = float(TotalCharges)
+    except (TypeError, ValueError):
+        raise gr.Error("⚠️ Total Charges must be a valid number")
+
+    if total_val < monthly_val:
+        raise gr.Error("⚠️ Total charges must be greater than or equal to Monthly charges")
+
     payload = {
         "gender": gender,
         "Partner": Partner,
@@ -68,14 +115,13 @@ def gradio_interface(
         "PaperlessBilling": PaperlessBilling,
         "PaymentMethod": PaymentMethod,
         "tenure": int(tenure),
-        "MonthlyCharges": float(MonthlyCharges),
-        "TotalCharges": float(TotalCharges),
+        "MonthlyCharges": monthly_val,
+        "TotalCharges": total_val,
     }
-    out = predict(payload)
-    return str(out)
+    return predict(payload)
 
 demo = gr.Interface(
-    fn=gradio_interface,
+    fn=validate_and_predict,
     inputs=[
         gr.Dropdown(["Male", "Female"], label="Gender"),
         gr.Dropdown(["Yes", "No"], label="Partner"),
@@ -96,12 +142,13 @@ demo = gr.Interface(
              "Bank transfer (automatic)", "Credit card (automatic)"],
             label="Payment Method"
         ),
-        gr.Number(label="Tenure (months)"),
-        gr.Number(label="Monthly Charges"),
-        gr.Number(label="Total Charges"),
+        gr.Textbox(label="Tenure (months)", placeholder="e.g. 12"),
+        gr.Textbox(label="Monthly Charges ($)", placeholder="e.g. 85"),
+        gr.Textbox(label="Total Charges ($)", placeholder="e.g. 1234"),
     ],
-    outputs="text",
-    title="Telco Churn Predictor",
+    outputs=gr.Textbox(label="Prediction"),
+    allow_flagging="never",
+    title="🔮 Telco Churn Predictor",
     description="Fill in the customer details to get a churn prediction.",
 )
 
